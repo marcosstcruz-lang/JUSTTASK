@@ -1,0 +1,6 @@
+{
+  "name": "Distribuidor Justo de Tarefas",
+  "description": "Aplicativo simples e didático para registrar solicitações de tarefas e balancear a distribuição de demandas na equipe durante o dia.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
