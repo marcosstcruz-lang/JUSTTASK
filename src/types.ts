@@ -12,7 +12,9 @@ export interface TaskRecord {
   memberId: string;
   memberName: string;
   memberRole?: string;
-  timestamp: number;
+  timestamp: number; // startedAt timestamp
+  completedAt?: number; // finished timestamp
+  status?: 'in_progress' | 'completed'; // default in_progress
   dateKey: string; // YYYY-MM-DD
   taskTitle?: string;
   notes?: string;

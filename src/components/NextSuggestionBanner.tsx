@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, AlertCircle, PlayCircle, CheckCircle2 } from 'lucide-react';
 import { TeamMember, TaskRecord } from '../types';
 import { getInitials } from '../utils/helpers';
 
@@ -8,6 +8,7 @@ interface NextSuggestionBannerProps {
   todayTasks: TaskRecord[];
   activeTabRole: string; // 'all' or specific role
   onAssignTask: (member: TeamMember) => void;
+  onOpenDetails?: (member: TeamMember) => void;
 }
 
 export const NextSuggestionBanner: React.FC<NextSuggestionBannerProps> = ({
@@ -20,17 +21,13 @@ export const NextSuggestionBanner: React.FC<NextSuggestionBannerProps> = ({
   const tabMembers = members.filter((m) =>
     activeTabRole === 'all' ? true : m.role === activeTabRole
   );
-  const activeMembers = tabMembers.filter((m) => m.available);
+  const presentMembers = tabMembers.filter((m) => m.available);
 
-  if (members.length === 0) {
+  if (members.length === 0 || tabMembers.length === 0) {
     return null;
   }
 
-  if (tabMembers.length === 0) {
-    return null;
-  }
-
-  if (activeMembers.length === 0) {
+  if (presentMembers.length === 0) {
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3 text-amber-800 text-sm">
         <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
@@ -42,11 +39,12 @@ export const NextSuggestionBanner: React.FC<NextSuggestionBannerProps> = ({
     );
   }
 
-  // Calculate task count per active member today
+  // Calculate task counts and active task status today
   const countMap: Record<string, number> = {};
   const lastTaskTimeMap: Record<string, number> = {};
+  const activeTaskMap: Record<string, TaskRecord> = {};
 
-  activeMembers.forEach((m) => {
+  presentMembers.forEach((m) => {
     countMap[m.id] = 0;
     lastTaskTimeMap[m.id] = 0;
   });
@@ -58,18 +56,54 @@ export const NextSuggestionBanner: React.FC<NextSuggestionBannerProps> = ({
         lastTaskTimeMap[t.memberId] = t.timestamp;
       }
     }
+    if (t.status === 'in_progress' || (!t.completedAt && t.status !== 'completed')) {
+      activeTaskMap[t.memberId] = t;
+    }
   });
 
-  // Find member(s) with lowest count
+  // Free/Available candidates (Present AND Not in an active task)
+  const freeCandidates = presentMembers.filter((m) => !activeTaskMap[m.id]);
+  const busyCount = presentMembers.length - freeCandidates.length;
+
+  if (freeCandidates.length === 0) {
+    // All present members are currently in task
+    return (
+      <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0">
+              <PlayCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-900 bg-amber-100 px-2 py-0.5 rounded">
+                  Equipe em Atividade
+                </span>
+                <span className="text-xs text-amber-800 font-medium">
+                  {busyCount} de {presentMembers.length} em tarefa
+                </span>
+              </div>
+              <p className="text-xs text-amber-900 font-medium mt-1">
+                Todos os colaboradores presentes {activeTabRole !== 'all' ? `de "${activeTabRole}"` : ''} estão executando tarefas agora.
+                Para liberar alguém para a próxima demanda, clique em <strong>&quot;Encerrar Tarefa&quot;</strong> no card do colaborador.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Find free member with lowest count
   let minCount = Infinity;
-  activeMembers.forEach((m) => {
+  freeCandidates.forEach((m) => {
     const count = countMap[m.id];
     if (count < minCount) {
       minCount = count;
     }
   });
 
-  const candidatesWithMin = activeMembers.filter(
+  const candidatesWithMin = freeCandidates.filter(
     (m) => countMap[m.id] === minCount
   );
 
@@ -97,6 +131,10 @@ export const NextSuggestionBanner: React.FC<NextSuggestionBannerProps> = ({
                 <Sparkles className="w-3 h-3" />
                 Próxima Recomendação {activeTabRole !== 'all' ? `• ${activeTabRole}` : ''}
               </span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Disponível Agora
+              </span>
               <span className="text-[11px] text-zinc-500 font-medium">
                 ({suggestedMember.role})
               </span>
@@ -113,9 +151,9 @@ export const NextSuggestionBanner: React.FC<NextSuggestionBannerProps> = ({
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 inline shrink-0" />
               <span>
                 {minCount === 0
-                  ? 'Ainda não recebeu nenhuma tarefa hoje (menor carga do dia).'
-                  : `Tem apenas ${minCount} ${minCount === 1 ? 'tarefa solicitada' : 'tarefas solicitadas'} hoje.`}
-                {candidateCount > 1 ? ` (${candidateCount} pessoas empatadas com ${minCount})` : ''}
+                  ? 'Livre e ainda não recebeu nenhuma tarefa hoje.'
+                  : `Livre no momento, com ${minCount} ${minCount === 1 ? 'tarefa realizada' : 'tarefas realizadas'} hoje.`}
+                {candidateCount > 1 ? ` (${candidateCount} colaboradores livres com ${minCount})` : ''}
               </span>
             </p>
           </div>

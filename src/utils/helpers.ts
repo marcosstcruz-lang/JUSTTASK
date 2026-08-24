@@ -52,6 +52,31 @@ export function formatTimePtBR(timestamp: number): string {
   });
 }
 
+export function formatTimeElapsedPtBR(startTimestamp: number, nowTimestamp = Date.now()): string {
+  const diffMs = Math.max(0, nowTimestamp - startTimestamp);
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  
+  if (diffMinutes < 1) return 'há menos de 1 min';
+  if (diffMinutes < 60) return `há ${diffMinutes} min`;
+  const hours = Math.floor(diffMinutes / 60);
+  const remainingMins = diffMinutes % 60;
+  if (remainingMins === 0) return `há ${hours}h`;
+  return `há ${hours}h ${remainingMins}min`;
+}
+
+export function formatDurationPtBR(startTimestamp: number, endTimestamp?: number): string {
+  const end = endTimestamp || Date.now();
+  const diffMs = Math.max(0, end - startTimestamp);
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+  if (diffMinutes < 1) return '< 1 min';
+  if (diffMinutes < 60) return `${diffMinutes} min`;
+  const hours = Math.floor(diffMinutes / 60);
+  const remainingMins = diffMinutes % 60;
+  if (remainingMins === 0) return `${hours}h`;
+  return `${hours}h ${remainingMins}m`;
+}
+
 export function getInitials(name: string): string {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/);

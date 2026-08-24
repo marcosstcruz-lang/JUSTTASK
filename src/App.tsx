@@ -108,7 +108,7 @@ export default function App() {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage((current) => (current === msg ? null : current));
-    }, 2800);
+    }, 3000);
   };
 
   // Sync to localStorage
@@ -166,6 +166,39 @@ export default function App() {
     return allTasks.filter((t) => t.dateKey === currentDateKey);
   }, [allTasks, currentDateKey]);
 
+  // Today's active in-progress task map per member
+  const memberActiveTaskMap = useMemo(() => {
+    const map: Record<string, TaskRecord> = {};
+    todayTasks.forEach((t) => {
+      if (t.status === 'in_progress' || (!t.completedAt && t.status !== 'completed')) {
+        map[t.memberId] = t;
+      }
+    });
+    return map;
+  }, [todayTasks]);
+
+  // Team real-time status summary
+  const teamStatusSummary = useMemo(() => {
+    let availableFreeCount = 0;
+    let inTaskCount = 0;
+    let absentCount = 0;
+
+    members.forEach((m) => {
+      if (!m.available) {
+        absentCount++;
+      } else {
+        const hasActiveTask = Boolean(memberActiveTaskMap[m.id]);
+        if (hasActiveTask) {
+          inTaskCount++;
+        } else {
+          availableFreeCount++;
+        }
+      }
+    });
+
+    return { availableFreeCount, inTaskCount, absentCount };
+  }, [members, memberActiveTaskMap]);
+
   // Today's task count map per member
   const memberTodayCountMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -197,7 +230,7 @@ export default function App() {
     return counts.length > 0 ? Math.max(...counts) : 0;
   }, [memberTodayCountMap]);
 
-  // Suggested member id in current tab
+  // Suggested member id in current tab (Prefers FREE / Available members)
   const suggestedMemberId = useMemo(() => {
     const tabMembers = members.filter((m) =>
       activeTabRole === 'all' ? true : m.role === activeTabRole
@@ -205,19 +238,23 @@ export default function App() {
     const active = tabMembers.filter((m) => m.available);
     if (active.length === 0) return null;
 
+    // Filter only those who are free (not currently occupied with an in_progress task)
+    const freeMembers = active.filter((m) => !memberActiveTaskMap[m.id]);
+    const candidatePool = freeMembers.length > 0 ? freeMembers : active;
+
     let min = Infinity;
-    active.forEach((m) => {
+    candidatePool.forEach((m) => {
       const c = memberTodayCountMap[m.id] || 0;
       if (c < min) min = c;
     });
 
-    const candidates = active.filter((m) => (memberTodayCountMap[m.id] || 0) === min);
+    const candidates = candidatePool.filter((m) => (memberTodayCountMap[m.id] || 0) === min);
     const sorted = candidates.sort((a, b) => {
       return (memberLastTaskMap[a.id] || 0) - (memberLastTaskMap[b.id] || 0);
     });
 
     return sorted[0]?.id || null;
-  }, [members, activeTabRole, memberTodayCountMap, memberLastTaskMap]);
+  }, [members, activeTabRole, memberActiveTaskMap, memberTodayCountMap, memberLastTaskMap]);
 
   // Actions for Task Assignment
   const handleOpenAssignModal = (member: TeamMember) => {
@@ -238,13 +275,31 @@ export default function App() {
       memberName,
       memberRole: member?.role,
       timestamp: Date.now(),
+      status: 'in_progress',
       dateKey: currentDateKey,
       taskTitle: finalTitle,
       notes: notes || undefined,
     };
 
     setAllTasks((prev) => [newRecord, ...prev]);
-    showToast(`Tarefa "${finalTitle}" atribuída para ${memberName}`);
+    showToast(`Tarefa "${finalTitle}" iniciada por ${memberName} (Em Tarefa)`);
+  };
+
+  // Action: Encerrar Tarefa (Mark task as completed)
+  const handleCompleteTask = (taskId: string) => {
+    const targetTask = allTasks.find((t) => t.id === taskId);
+    setAllTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? { ...t, status: 'completed', completedAt: Date.now() }
+          : t
+      )
+    );
+    if (targetTask) {
+      showToast(`Tarefa de ${targetTask.memberName} encerrada com sucesso! Colaborador agora está disponível.`);
+    } else {
+      showToast('Tarefa encerrada com sucesso!');
+    }
   };
 
   const handleDecrementTask = (memberId: string) => {
@@ -365,15 +420,15 @@ export default function App() {
     });
   };
 
-  const activeMembersCount = members.filter((m) => m.available).length;
-
   return (
     <div className="min-h-screen bg-zinc-100/60 text-zinc-900 flex flex-col font-sans">
       {/* Top Header */}
       <Header
         currentDateKey={currentDateKey}
         totalTasksToday={todayTasks.length}
-        activeMembersCount={activeMembersCount}
+        availableFreeCount={teamStatusSummary.availableFreeCount}
+        inTaskCount={teamStatusSummary.inTaskCount}
+        absentCount={teamStatusSummary.absentCount}
         totalMembersCount={members.length}
         onOpenAddMember={() => {
           setEditingMember(null);
@@ -394,14 +449,14 @@ export default function App() {
             </div>
             <div className="flex-1">
               <h2 className="text-sm font-bold text-zinc-900">
-                Distribuição Equilibrada e Seleção de Tarefas na Lista Suspensa
+                Distribuição Justa, Status em Tempo Real e Encerramento de Tarefas
               </h2>
               <p className="text-xs text-zinc-600 mt-1 leading-relaxed">
-                • Ao clicar em <strong>&quot;+1 Pedir Tarefa&quot;</strong>, você pode <strong>selecionar a tarefa na lista suspensa</strong> ou cadastrar uma nova opção na hora.
+                • <strong>Quem está disponível / em tarefa:</strong> Cada colaborador mostra seu status em tempo real (🟢 <em>Disponível/Livre</em>, 🟡 <em>Em Tarefa</em> ou ⚪ <em>Ausente</em>).
                 <br />
-                • Clique em <strong>&quot;Tarefas Cadastradas&quot;</strong> no topo para cadastrar e descadastrar os tipos de tarefas da sua operação.
+                • <strong>Encerrar Tarefa:</strong> Quando o colaborador terminar a atividade, clique em <strong>&quot;Encerrar Tarefa&quot;</strong> no card para liberá-lo imediatamente como disponível.
                 <br />
-                • Clique no nome de qualquer colaborador para ver o histórico individual ou em <strong>&quot;Relatório Mensal&quot;</strong> para exportar para o Excel.
+                • <strong>Sugestão Inteligente:</strong> O sistema prioriza colaboradores que estão <strong>livres</strong> e com menor quantidade de tarefas no dia.
               </p>
             </div>
           </div>
@@ -413,6 +468,7 @@ export default function App() {
           todayTasks={todayTasks}
           activeTabRole={activeTabRole}
           onAssignTask={handleOpenAssignModal}
+          onOpenDetails={(m) => setSelectedMemberForDetails(m)}
         />
 
         {/* Role Tabs and Search Bar */}
@@ -500,10 +556,12 @@ export default function App() {
                     key={member.id}
                     member={member}
                     taskCount={memberTodayCountMap[member.id] || 0}
+                    activeTask={memberActiveTaskMap[member.id]}
                     lastTaskTimestamp={memberLastTaskMap[member.id]}
                     maxTasksInTeam={maxTasksInTeam}
                     isSuggested={member.id === suggestedMemberId}
                     onRequestTask={handleOpenAssignModal}
+                    onCompleteTask={handleCompleteTask}
                     onDecrement={handleDecrementTask}
                     onToggleAvailability={handleToggleAvailability}
                     onOpenDetails={(m) => setSelectedMemberForDetails(m)}
@@ -526,6 +584,7 @@ export default function App() {
             records={todayTasks}
             members={members}
             onRemoveRecord={handleRemoveSingleRecord}
+            onCompleteTask={handleCompleteTask}
             onOpenMemberDetails={(m) => setSelectedMemberForDetails(m)}
           />
         </div>
@@ -533,7 +592,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="bg-white border-t border-zinc-200 py-4 px-6 text-center text-xs text-zinc-500 mt-auto">
-        <p>Distribuidor Justo de Tarefas • Balanço Diário e Relatórios Mensais da Equipe</p>
+        <p>Distribuidor Justo de Tarefas • Balanço Diário, Status de Disponibilidade e Relatórios Mensais</p>
       </footer>
 
       {/* Modal: Select & Assign Task via Dropdown */}
@@ -565,6 +624,7 @@ export default function App() {
         isOpen={Boolean(selectedMemberForDetails)}
         onClose={() => setSelectedMemberForDetails(null)}
         onAddTask={(mId, mName, taskTitle, notes) => handleAssignTask(mId, mName, taskTitle, notes)}
+        onCompleteTask={handleCompleteTask}
         onRemoveTask={handleRemoveSingleRecord}
         onOpenManageTasks={() => {
           setSelectedMemberForDetails(null);

@@ -5,7 +5,9 @@ import { formatDatePtBR } from '../utils/helpers';
 interface HeaderProps {
   currentDateKey: string;
   totalTasksToday: number;
-  activeMembersCount: number;
+  availableFreeCount: number;
+  inTaskCount: number;
+  absentCount: number;
   totalMembersCount: number;
   onOpenAddMember: () => void;
   onOpenReport: () => void;
@@ -16,7 +18,9 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   currentDateKey,
   totalTasksToday,
-  activeMembersCount,
+  availableFreeCount,
+  inTaskCount,
+  absentCount,
   totalMembersCount,
   onOpenAddMember,
   onOpenReport,
@@ -25,8 +29,8 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   return (
     <header className="bg-white border-b border-zinc-200 sticky top-0 z-30 shadow-xs">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3.5">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           {/* Brand & Date */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-xs shrink-0">
@@ -45,14 +49,26 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick Metrics & Main Action Buttons */}
           <div className="flex items-center flex-wrap gap-2">
-            <div className="hidden sm:flex items-center gap-2.5 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-1.5 text-xs text-zinc-700">
-              <span>
-                <strong>{totalTasksToday}</strong> {totalTasksToday === 1 ? 'demanda hoje' : 'demandas hoje'}
+            {/* Real-time Status Badges */}
+            <div className="hidden lg:flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-1.5 text-xs">
+              <span className="font-semibold text-zinc-800 flex items-center gap-1">
+                <strong>{totalTasksToday}</strong> tarefas hoje
               </span>
-              <span className="text-zinc-300">•</span>
-              <span className="text-zinc-600">
-                <strong>{activeMembersCount}</strong> de {totalMembersCount} ativos
+              <span className="text-zinc-300">|</span>
+              <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                {availableFreeCount} Livres
               </span>
+              <span className="text-amber-700 font-semibold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                {inTaskCount} Em Tarefa
+              </span>
+              {absentCount > 0 && (
+                <span className="text-zinc-500 font-medium flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-zinc-300" />
+                  {absentCount} Ausentes
+                </span>
+              )}
             </div>
 
             {/* Manage Tasks Button (Cadastrar e Descadastrar) */}
@@ -87,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition-colors shadow-2xs cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Adicionar Colaborador</span>
+              <span>Novo Colaborador</span>
             </button>
 
             {/* Reset Day */}
@@ -100,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="inline-flex items-center gap-1 bg-zinc-100 hover:bg-red-50 hover:text-red-700 text-zinc-600 text-xs font-medium px-2.5 py-2 rounded-xl transition-colors border border-zinc-200 hover:border-red-200 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">Zerar Dia</span>
+                <span className="hidden xl:inline">Zerar Dia</span>
               </button>
             )}
           </div>
